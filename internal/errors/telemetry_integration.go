@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"unicode"
 
 	"github.com/getsentry/sentry-go"
@@ -243,7 +242,6 @@ var globalTelemetryReporter TelemetryReporter
 var (
 	errorHooks      []ErrorHook
 	errorHooksMutex sync.RWMutex
-	hasActiveReporting atomic.Bool // true if telemetry is enabled OR hooks exist
 )
 
 // SetTelemetryReporter sets the global telemetry reporter

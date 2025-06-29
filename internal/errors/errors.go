@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,6 +19,10 @@ type CategorizedError interface {
 	error
 	ErrorCategory() ErrorCategory
 }
+
+// hasActiveReporting tracks whether telemetry or hooks are active
+// This is declared here to ensure it's initialized before use in Build()
+var hasActiveReporting atomic.Bool
 
 const (
 	CategoryModelInit      ErrorCategory = "model-initialization"
