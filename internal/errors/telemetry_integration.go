@@ -39,6 +39,8 @@ var (
 func init() {
 	// Initialize hasActiveReporting to false (no telemetry or hooks by default)
 	hasActiveReporting.Store(false)
+	// Mark package as initialized
+	packageInitialized.Store(true)
 }
 
 // TelemetryReporter is an interface for reporting errors to telemetry systems

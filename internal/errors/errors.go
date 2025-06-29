@@ -24,6 +24,9 @@ type CategorizedError interface {
 // This is declared here to ensure it's initialized before use in Build()
 var hasActiveReporting atomic.Bool
 
+// packageInitialized tracks whether the package has been initialized
+var packageInitialized atomic.Bool
+
 const (
 	CategoryModelInit      ErrorCategory = "model-initialization"
 	CategoryModelLoad      ErrorCategory = "model-loading"
@@ -53,13 +56,12 @@ const (
 // EnhancedError wraps an error with additional context and metadata
 type EnhancedError struct {
 	Err       error                  // Original error
-	component string                 // Component where error occurred (lazily detected)
+	component string                 // Component where error occurred
 	Category  ErrorCategory          // Error category for better grouping
 	Context   map[string]interface{} // Additional context data
 	Timestamp time.Time              // When the error occurred
 	reported  bool                   // Whether telemetry has been sent
 	mu        sync.RWMutex           // Mutex to protect concurrent access
-	detected  bool                   // Whether component has been auto-detected
 }
 
 // Error implements the error interface
@@ -80,21 +82,10 @@ func (ee *EnhancedError) Is(target error) bool {
 	return Is(ee.Err, target)
 }
 
-// GetComponent returns the component name, detecting it lazily if needed
+// GetComponent returns the component name
 func (ee *EnhancedError) GetComponent() string {
-	ee.mu.Lock()
-	defer ee.mu.Unlock()
-	
-	// If component is empty and hasn't been detected yet, detect it now
-	if ee.component == "" && !ee.detected {
-		ee.component = detectComponent()
-		ee.detected = true
-		// Set to "unknown" if detection failed
-		if ee.component == "" {
-			ee.component = "unknown"
-		}
-	}
-	
+	ee.mu.RLock()
+	defer ee.mu.RUnlock()
 	return ee.component
 }
 
@@ -233,20 +224,18 @@ func (eb *ErrorBuilder) Timing(operation string, duration time.Duration) *ErrorB
 
 // Build creates the EnhancedError and triggers optional telemetry reporting
 func (eb *ErrorBuilder) Build() *EnhancedError {
-	// Fast path - skip expensive operations if no reporting is active
-	if !hasActiveReporting.Load() {
+	// Fast path - skip expensive operations if no reporting is active or package not initialized
+	if !packageInitialized.Load() || !hasActiveReporting.Load() {
 		ee := &EnhancedError{
 			Err:       eb.err,
 			component: eb.component, // Use provided or empty
 			Category:  eb.category,  // Use provided or empty
 			Context:   eb.context,
 			Timestamp: time.Now(),
-			detected:  eb.component != "", // Mark as detected if component was provided
 		}
 		// Set defaults without expensive detection
 		if ee.component == "" {
 			ee.component = "unknown"
-			ee.detected = true
 		}
 		if ee.Category == "" {
 			ee.Category = CategoryGeneric
@@ -271,7 +260,6 @@ func (eb *ErrorBuilder) Build() *EnhancedError {
 		Category:  eb.category,
 		Context:   eb.context,
 		Timestamp: time.Now(),
-		detected:  true, // Mark as detected since we just detected it
 	}
 
 	// Report to telemetry if available and enabled
