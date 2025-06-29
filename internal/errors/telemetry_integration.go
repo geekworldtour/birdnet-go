@@ -35,13 +35,6 @@ var (
 	}
 )
 
-// Initialize package state
-func init() {
-	// Initialize hasActiveReporting to false (no telemetry or hooks by default)
-	hasActiveReporting.Store(false)
-	// Mark package as initialized
-	packageInitialized.Store(true)
-}
 
 // TelemetryReporter is an interface for reporting errors to telemetry systems
 type TelemetryReporter interface {
@@ -285,45 +278,48 @@ func updateActiveReportingStatus() {
 
 // reportToTelemetry reports an error to the configured telemetry system
 func reportToTelemetry(ee *EnhancedError) {
-	// Skip entirely if nothing to do
-	if !hasActiveReporting.Load() {
-		return
-	}
-
-	// Report to telemetry reporter
-	if globalTelemetryReporter != nil && globalTelemetryReporter.IsEnabled() {
-		globalTelemetryReporter.ReportError(ee)
-	}
-
-	// Skip hook processing if no hooks exist
-	errorHooksMutex.RLock()
-	hooksExist := len(errorHooks) > 0
-	if !hooksExist {
-		errorHooksMutex.RUnlock()
-		return
-	}
-	
-	// Copy hooks while holding lock
-	hooks := make([]ErrorHook, len(errorHooks))
-	copy(hooks, errorHooks)
-	errorHooksMutex.RUnlock()
-
-	// Call hooks outside of lock to avoid deadlock
-	for _, hook := range hooks {
-		if hook != nil {
-			// Wrap hook call in panic recovery
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						// Log the panic but don't let it crash the program
-						// We can't use our own error system here to avoid recursion
-						fmt.Printf("Error hook panicked: %v\n", r)
-					}
-				}()
-				hook(ee)
-			}()
+	// Use a goroutine to avoid blocking the caller
+	go func() {
+		// Skip entirely if nothing to do
+		if !hasActiveReporting.Load() {
+			return
 		}
-	}
+
+		// Report to telemetry reporter
+		if globalTelemetryReporter != nil && globalTelemetryReporter.IsEnabled() {
+			globalTelemetryReporter.ReportError(ee)
+		}
+
+		// Skip hook processing if no hooks exist
+		errorHooksMutex.RLock()
+		hooksExist := len(errorHooks) > 0
+		if !hooksExist {
+			errorHooksMutex.RUnlock()
+			return
+		}
+		
+		// Copy hooks while holding lock
+		hooks := make([]ErrorHook, len(errorHooks))
+		copy(hooks, errorHooks)
+		errorHooksMutex.RUnlock()
+
+		// Call hooks outside of lock to avoid deadlock
+		for _, hook := range hooks {
+			if hook != nil {
+				// Wrap hook call in panic recovery
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							// Log the panic but don't let it crash the program
+							// We can't use our own error system here to avoid recursion
+							fmt.Printf("Error hook panicked: %v\n", r)
+						}
+					}()
+					hook(ee)
+				}()
+			}
+		}
+	}()
 }
 
 // PrivacyScrubber is a function type for privacy scrubbing

@@ -27,6 +27,12 @@ var hasActiveReporting atomic.Bool
 // packageInitialized tracks whether the package has been initialized
 var packageInitialized atomic.Bool
 
+func init() {
+	// Initialize the package state immediately
+	hasActiveReporting.Store(false)
+	packageInitialized.Store(true)
+}
+
 const (
 	CategoryModelInit      ErrorCategory = "model-initialization"
 	CategoryModelLoad      ErrorCategory = "model-loading"
@@ -224,15 +230,17 @@ func (eb *ErrorBuilder) Timing(operation string, duration time.Duration) *ErrorB
 
 // Build creates the EnhancedError and triggers optional telemetry reporting
 func (eb *ErrorBuilder) Build() *EnhancedError {
+	// Create the error without any blocking operations first
+	ee := &EnhancedError{
+		Err:       eb.err,
+		component: eb.component,
+		Category:  eb.category,
+		Context:   eb.context,
+		Timestamp: time.Now(),
+	}
+
 	// Fast path - skip expensive operations if no reporting is active or package not initialized
 	if !packageInitialized.Load() || !hasActiveReporting.Load() {
-		ee := &EnhancedError{
-			Err:       eb.err,
-			component: eb.component, // Use provided or empty
-			Category:  eb.category,  // Use provided or empty
-			Context:   eb.context,
-			Timestamp: time.Now(),
-		}
 		// Set defaults without expensive detection
 		if ee.component == "" {
 			ee.component = "unknown"
@@ -254,13 +262,9 @@ func (eb *ErrorBuilder) Build() *EnhancedError {
 		eb.category = detectCategory(eb.err, eb.component)
 	}
 
-	ee := &EnhancedError{
-		Err:       eb.err,
-		component: eb.component,
-		Category:  eb.category,
-		Context:   eb.context,
-		Timestamp: time.Now(),
-	}
+	// Update the error with detected values
+	ee.component = eb.component
+	ee.Category = eb.category
 
 	// Report to telemetry if available and enabled
 	reportToTelemetry(ee)
