@@ -38,7 +38,7 @@ logging.InfoFile("Application started", "version", "1.0.0", "pid", os.Getpid())
 
 ### 2. Service-Specific Logger
 
-Most modules should create their own dedicated logger:
+Most modules should create their own dedicated logger using `ForService()`:
 
 ```go
 package myservice
@@ -51,7 +51,12 @@ import (
 var logger *slog.Logger
 
 func init() {
-    logger = logging.NewFileLogger("myservice", logging.InfoLevel)
+    logger = logging.ForService("myservice")
+    
+    // Defensive initialization for early startup
+    if logger == nil {
+        logger = slog.Default().With("service", "myservice")
+    }
 }
 
 func DoWork() {
@@ -130,7 +135,12 @@ var logger *slog.Logger
 
 func init() {
     // Create service-specific logger
-    logger = logging.NewFileLogger("birdweather", logging.InfoLevel)
+    logger = logging.ForService("birdweather")
+    
+    // Defensive initialization for early startup
+    if logger == nil {
+        logger = slog.Default().With("service", "birdweather")
+    }
 }
 
 // Use throughout the module
@@ -216,6 +226,21 @@ logger.Error("Operation failed",
     "component", "birdweather")
 ```
 
+### Event Bus Integration
+
+The logging system integrates with the event bus for asynchronous error processing:
+
+```go
+// Errors are automatically published to the event bus
+// Workers consume these events for telemetry and notifications
+logger.Error("Critical error occurred", 
+    "error", enhancedErr,
+    "severity", "critical")
+
+// Performance benefit: 3,275x improvement over synchronous logging
+// (100.78ms → 30.77μs)
+```
+
 ## Common Patterns
 
 ### 1. Request/Response Logging
@@ -281,6 +306,39 @@ func updateConfiguration(newConfig Config) {
 }
 ```
 
+### 4. State Transition Logging
+
+```go
+func initializeComponent() error {
+    logger.Debug("initializing component")
+    
+    if err := setupDependencies(); err != nil {
+        logger.Error("dependency setup failed", "error", err)
+        return err
+    }
+    
+    logger.Info("component initialized successfully",
+        "dependencies", len(dependencies),
+        "startup_time_ms", time.Since(start).Milliseconds())
+    return nil
+}
+```
+
+### 5. Performance Metrics Logging
+
+```go
+func reportPerformanceMetrics() {
+    stats := getSystemStats()
+    
+    logger.Info("system performance metrics",
+        "events_processed", stats.EventsProcessed,
+        "events_dropped", stats.EventsDropped,
+        "fast_path_percent", fmt.Sprintf("%.2f%%", stats.FastPathPercent),
+        "memory_mb", stats.MemoryMB,
+        "cpu_percent", stats.CPUPercent)
+}
+```
+
 ## Log File Locations
 
 By default, log files are created in the `logs/` directory:
@@ -292,6 +350,9 @@ By default, log files are created in the `logs/` directory:
 - `logs/notification.log` - Notification service
 - `logs/weather.log` - Weather service
 - `logs/telemetry.log` - Telemetry service
+- `logs/events.log` - Event bus operations
+- `logs/init-manager.log` - Initialization coordination
+- `logs/telemetry-integration.log` - Telemetry worker operations
 
 ## Testing
 
@@ -374,6 +435,113 @@ If logging impacts performance:
 3. Consider sampling for high-frequency events
 4. Review log rotation settings
 
+## Advanced Patterns
+
+### Circular Dependency Avoidance
+
+For initialization code that might create circular dependencies:
+
+```go
+package init_manager
+
+import (
+    "fmt" // Using fmt instead of errors package to avoid circular dependencies
+    "github.com/tphakala/birdnet-go/internal/logging"
+)
+
+func initializeSystem() error {
+    // Use standard errors in initialization to avoid:
+    // telemetry → errors → telemetry circular dependency
+    if err := validate(); err != nil {
+        return fmt.Errorf("validation failed: %w", err)
+    }
+    
+    logger := logging.ForService("init-manager")
+    logger.Info("system initialization completed")
+    return nil
+}
+```
+
+### Defensive Logger Creation
+
+```go
+func getLoggerSafe(service string) *slog.Logger {
+    logger := logging.ForService(service)
+    if logger == nil {
+        return slog.Default().With("service", service)
+    }
+    return logger
+}
+```
+
+### Integration Health Monitoring
+
+```go
+func monitorIntegrationHealth() {
+    logger := logging.ForService("health-monitor")
+    
+    // Check all integrated systems
+    systems := []string{"telemetry", "events", "notifications"}
+    
+    for _, system := range systems {
+        if health := checkSystemHealth(system); !health.OK {
+            logger.Warn("system health check failed",
+                "system", system,
+                "error", health.Error,
+                "last_success", health.LastSuccess)
+        }
+    }
+}
+```
+
+## Best Practices Summary
+
+1. **Always use `logging.ForService()`** for component identification
+2. **Provide fallback loggers** for initialization scenarios
+3. **Use defensive nil checks** before logging operations
+4. **Avoid enhanced errors in initialization** code to prevent circular dependencies
+5. **Log state transitions** for complex initialization sequences
+6. **Include performance metrics** in periodic logging
+7. **Use structured logging** with key-value pairs for operational data
+8. **Implement graceful degradation** when logging systems aren't available
+9. **Log integration health** for monitoring distributed components
+10. **Use event bus integration** for async error processing when available
+
+## Privacy and Security
+
+### Privacy-Safe Logging
+
+The telemetry system provides privacy scrubbing that integrates with logging:
+
+```go
+// Privacy scrubbing is automatically applied to telemetry logs
+// Sensitive data is scrubbed before being sent to external services
+logger.Info("user action logged", 
+    "action", "detection_upload",
+    "user_id", userID, // Automatically scrubbed in telemetry
+    "success", true)
+```
+
+### Secure Logging Practices
+
+```go
+// Never log sensitive data directly
+logger.Info("authentication successful",
+    "user_id", user.ID,
+    "method", "oauth",
+    // "password", password, // NEVER log passwords
+    // "token", token,       // NEVER log tokens
+)
+
+// Use structured logging to avoid accidental sensitive data exposure
+logger.Error("database connection failed",
+    "error", err.Error(), // Error messages should not contain credentials
+    "host", config.Host,
+    "database", config.Database,
+    // "connection_string", config.ConnectionString, // NEVER log connection strings
+)
+```
+
 ## Future Enhancements
 
 Planned improvements:
@@ -381,3 +549,5 @@ Planned improvements:
 - Integration with centralized logging systems
 - Advanced filtering and routing
 - Metrics extraction from logs
+- Enhanced privacy scrubbing integration
+- Distributed tracing correlation
