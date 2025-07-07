@@ -38,7 +38,7 @@ func (f *FFmpegExporter) ExportToFile(ctx context.Context, audioData *audiocore.
 	f.ffmpegPath = config.FFmpegPath
 
 	// Generate file path
-	fileName := GenerateFileName(config.FileNameTemplate, audioData.SourceID, audioData.Timestamp, config.Format)
+	fileName := GenerateFileNameWithConfig(config, audioData.SourceID, audioData.Timestamp)
 	filePath := filepath.Join(config.OutputPath, fileName)
 
 	// Ensure output directory exists

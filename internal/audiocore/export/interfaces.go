@@ -39,6 +39,10 @@ type Config struct {
 	// Supports: {source}, {date}, {time}, {timestamp}
 	FileNameTemplate string
 
+	// CustomFileName allows specifying a custom filename (overrides template)
+	// If set, this filename will be used instead of the template
+	CustomFileName string
+
 	// Bitrate for lossy formats (e.g., "128k", "192k")
 	// Only used for MP3, AAC, Opus
 	Bitrate string

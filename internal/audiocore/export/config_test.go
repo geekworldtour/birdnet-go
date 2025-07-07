@@ -261,6 +261,54 @@ func TestGenerateFileName(t *testing.T) {
 	}
 }
 
+func TestGenerateFileNameWithConfig(t *testing.T) {
+	timestamp := time.Date(2024, 1, 15, 14, 30, 45, 0, time.UTC)
+	sourceID := "test_source"
+
+	tests := []struct {
+		name     string
+		config   *Config
+		expected string
+	}{
+		{
+			name: "custom filename provided",
+			config: &Config{
+				Format:           FormatWAV,
+				FileNameTemplate: "{source}_{timestamp}",
+				CustomFileName:   "2024/01/tadorna_ferruginea_95p_20240115T143045Z.wav",
+			},
+			expected: "2024/01/tadorna_ferruginea_95p_20240115T143045Z.wav",
+		},
+		{
+			name: "no custom filename - use template",
+			config: &Config{
+				Format:           FormatWAV,
+				FileNameTemplate: "{source}_{timestamp}",
+				CustomFileName:   "",
+			},
+			expected: "test_source_20240115_143045.wav",
+		},
+		{
+			name: "custom filename with path components",
+			config: &Config{
+				Format:           FormatMP3,
+				FileNameTemplate: "{source}",
+				CustomFileName:   "birds/2024/parus_major_87p_20240115T143045Z.mp3",
+			},
+			expected: "birds/2024/parus_major_87p_20240115T143045Z.mp3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GenerateFileNameWithConfig(tt.config, sourceID, timestamp)
+			if result != tt.expected {
+				t.Errorf("GenerateFileNameWithConfig() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestGetFFmpegFormat(t *testing.T) {
 	tests := []struct {
 		format Format

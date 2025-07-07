@@ -117,6 +117,11 @@ func (m *ExportManager) SaveClip(sourceID string, triggerTime time.Time, duratio
 
 // ExportClip extracts and exports a clip to a file
 func (m *ExportManager) ExportClip(ctx context.Context, sourceID string, triggerTime time.Time, duration time.Duration) (*export.ExportResult, error) {
+	return m.ExportClipWithFileName(ctx, sourceID, triggerTime, duration, "")
+}
+
+// ExportClipWithFileName extracts and exports a clip to a file with a custom filename
+func (m *ExportManager) ExportClipWithFileName(ctx context.Context, sourceID string, triggerTime time.Time, duration time.Duration, fileName string) (*export.ExportResult, error) {
 	// First extract the clip
 	audioData, err := m.SaveClip(sourceID, triggerTime, duration)
 	if err != nil {
@@ -136,8 +141,14 @@ func (m *ExportManager) ExportClip(ctx context.Context, sourceID string, trigger
 			Build()
 	}
 
+	// Create a copy of the export config to modify it
+	exportConfig := *config.exportConfig
+	if fileName != "" {
+		exportConfig.CustomFileName = fileName
+	}
+
 	// Export using export manager
-	result, err := m.exportManager.Export(ctx, audioData, config.exportConfig)
+	result, err := m.exportManager.Export(ctx, audioData, &exportConfig)
 	if err != nil {
 		return nil, errors.New(err).
 			Component("audiocore").
@@ -150,7 +161,7 @@ func (m *ExportManager) ExportClip(ctx context.Context, sourceID string, trigger
 	m.logger.Info("clip exported",
 		"source_id", sourceID,
 		"file_path", result.FilePath,
-		"format", config.exportConfig.Format,
+		"format", exportConfig.Format,
 		"duration", audioData.Duration,
 		"export_time", result.Duration)
 

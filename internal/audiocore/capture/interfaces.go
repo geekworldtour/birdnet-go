@@ -48,6 +48,9 @@ type Manager interface {
 	// ExportClip extracts and exports a clip to a file
 	ExportClip(ctx context.Context, sourceID string, triggerTime time.Time, duration time.Duration) (*export.ExportResult, error)
 
+	// ExportClipWithFileName extracts and exports a clip to a file with a custom filename
+	ExportClipWithFileName(ctx context.Context, sourceID string, triggerTime time.Time, duration time.Duration, fileName string) (*export.ExportResult, error)
+
 	// GetBuffer gets the capture buffer for a source (for testing)
 	GetBuffer(sourceID string) (Buffer, bool)
 

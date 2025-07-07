@@ -211,8 +211,8 @@ func (a *DatabaseAction) Execute(data interface{}) error {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			
-			// Export clip with 15 second duration
-			exportResult, err := captureManager.ExportClip(ctx, a.Note.Source, a.Note.BeginTime, 15*time.Second)
+			// Export clip with 15 second duration using the species-based filename
+			exportResult, err := captureManager.ExportClipWithFileName(ctx, a.Note.Source, a.Note.BeginTime, 15*time.Second, a.Note.ClipName)
 			if err != nil {
 				log.Printf("❌ Failed to export audio clip via audiocore: %v", err)
 				return err

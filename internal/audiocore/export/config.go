@@ -147,7 +147,7 @@ func parseIntFromString(s string) (int, error) {
 	return val, nil
 }
 
-// GenerateFileName generates a file name based on the template
+// GenerateFileName generates a file name based on the template or custom filename
 func GenerateFileName(template, sourceID string, timestamp time.Time, format Format) string {
 	fileName := template
 
@@ -162,6 +162,17 @@ func GenerateFileName(template, sourceID string, timestamp time.Time, format For
 
 	// Clean the path
 	return filepath.Clean(fileName)
+}
+
+// GenerateFileNameWithConfig generates a file name using config (supports custom filename)
+func GenerateFileNameWithConfig(config *Config, sourceID string, timestamp time.Time) string {
+	// If custom filename is provided, use it directly
+	if config.CustomFileName != "" {
+		return filepath.Clean(config.CustomFileName)
+	}
+
+	// Otherwise use the template-based generation
+	return GenerateFileName(config.FileNameTemplate, sourceID, timestamp, config.Format)
 }
 
 // GetFFmpegFormat returns the FFmpeg format name for a Format

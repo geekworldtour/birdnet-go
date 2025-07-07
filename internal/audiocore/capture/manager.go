@@ -2,10 +2,12 @@
 package capture
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/tphakala/birdnet-go/internal/audiocore"
+	"github.com/tphakala/birdnet-go/internal/audiocore/export"
 	"github.com/tphakala/birdnet-go/internal/errors"
 	"log/slog"
 )
@@ -203,4 +205,23 @@ func (c *CaptureManager) Close() error {
 	c.configs = make(map[string]CaptureConfig)
 
 	return nil
+}
+
+// ExportClip returns an error since the basic CaptureManager doesn't support export
+func (c *CaptureManager) ExportClip(ctx context.Context, sourceID string, triggerTime time.Time, duration time.Duration) (*export.ExportResult, error) {
+	return nil, errors.Newf("ExportClip not supported by basic CaptureManager, use ExportManager instead").
+		Component(audiocore.ComponentAudioCore).
+		Category(errors.CategoryGeneric).
+		Context("source_id", sourceID).
+		Build()
+}
+
+// ExportClipWithFileName returns an error since the basic CaptureManager doesn't support export
+func (c *CaptureManager) ExportClipWithFileName(ctx context.Context, sourceID string, triggerTime time.Time, duration time.Duration, fileName string) (*export.ExportResult, error) {
+	return nil, errors.Newf("ExportClipWithFileName not supported by basic CaptureManager, use ExportManager instead").
+		Component(audiocore.ComponentAudioCore).
+		Category(errors.CategoryGeneric).
+		Context("source_id", sourceID).
+		Context("file_name", fileName).
+		Build()
 }

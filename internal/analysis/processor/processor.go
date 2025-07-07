@@ -26,6 +26,7 @@ import (
 // CaptureManager defines the interface for audio capture and export operations
 type CaptureManager interface {
 	ExportClip(ctx context.Context, sourceID string, triggerTime time.Time, duration time.Duration) (*export.ExportResult, error)
+	ExportClipWithFileName(ctx context.Context, sourceID string, triggerTime time.Time, duration time.Duration, fileName string) (*export.ExportResult, error)
 	IsCaptureEnabled(sourceID string) bool
 }
 

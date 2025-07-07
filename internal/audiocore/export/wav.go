@@ -30,7 +30,7 @@ func (w *WAVExporter) ExportToFile(ctx context.Context, audioData *audiocore.Aud
 	}
 
 	// Generate file path
-	fileName := GenerateFileName(config.FileNameTemplate, audioData.SourceID, audioData.Timestamp, FormatWAV)
+	fileName := GenerateFileNameWithConfig(config, audioData.SourceID, audioData.Timestamp)
 	filePath := filepath.Join(config.OutputPath, fileName)
 
 	// Ensure output directory exists
