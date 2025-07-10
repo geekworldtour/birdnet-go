@@ -130,16 +130,20 @@ func (ds *DataStore) SetMetrics(m *Metrics) {
 
 // SetSunCalcMetrics sets the metrics instance for the SunCalc service
 func (ds *DataStore) SetSunCalcMetrics(suncalcMetrics any) {
-	ds.metricsMu.RLock()
-	sunCalc := ds.SunCalc
-	ds.metricsMu.RUnlock()
-	
-	if sunCalc != nil && suncalcMetrics != nil {
+	if ds.SunCalc != nil && suncalcMetrics != nil {
 		// Type assert to the actual metrics type
 		if m, ok := suncalcMetrics.(*metrics.SunCalcMetrics); ok {
-			sunCalc.SetMetrics(m)
+			ds.SunCalc.SetMetrics(m)
 		}
 	}
+}
+
+// getMetricsSafely returns a copy of the metrics instance in a thread-safe manner
+// This helper method is intended for testing purposes to avoid exposing internal mutex details
+func (ds *DataStore) getMetricsSafely() *Metrics {
+	ds.metricsMu.RLock()
+	defer ds.metricsMu.RUnlock()
+	return ds.metrics
 }
 
 // Save stores a note and its associated results as a single transaction in the database.
@@ -1323,11 +1327,11 @@ func (ds *DataStore) SaveImageCache(cache *ImageCache) error {
 			
 			// Record error metric
 			ds.metricsMu.RLock()
-			metrics := ds.metrics
+			dsMetrics := ds.metrics
 			ds.metricsMu.RUnlock()
-			if metrics != nil {
-				metrics.RecordImageCacheOperation("save", "error")
-				metrics.RecordImageCacheDuration("save", time.Since(start).Seconds())
+			if dsMetrics != nil {
+				dsMetrics.RecordImageCacheOperation("save", "error")
+				dsMetrics.RecordImageCacheDuration("save", time.Since(start).Seconds())
 			}
 			
 			return enhancedErr
@@ -1336,11 +1340,11 @@ func (ds *DataStore) SaveImageCache(cache *ImageCache) error {
 	
 	// Record success metric
 	ds.metricsMu.RLock()
-	metrics := ds.metrics
+	dsMetrics := ds.metrics
 	ds.metricsMu.RUnlock()
-	if metrics != nil {
-		metrics.RecordImageCacheOperation("save", "success")
-		metrics.RecordImageCacheDuration("save", time.Since(start).Seconds())
+	if dsMetrics != nil {
+		dsMetrics.RecordImageCacheOperation("save", "success")
+		dsMetrics.RecordImageCacheDuration("save", time.Since(start).Seconds())
 	}
 	
 	return nil
@@ -2001,11 +2005,11 @@ func (ds *DataStore) saveNoteInTransaction(tx *gorm.DB, note *Note, txID string,
 		
 		// Record error metric
 		ds.metricsMu.RLock()
-		metrics := ds.metrics
+		dsMetrics := ds.metrics
 		ds.metricsMu.RUnlock()
-		if metrics != nil {
-			metrics.RecordNoteOperation("save", "error")
-			metrics.RecordDbOperationError("create", "notes", categorizeError(err))
+		if dsMetrics != nil {
+			dsMetrics.RecordNoteOperation("save", "error")
+			dsMetrics.RecordDbOperationError("create", "notes", categorizeError(err))
 		}
 		
 		return enhancedErr
@@ -2013,10 +2017,10 @@ func (ds *DataStore) saveNoteInTransaction(tx *gorm.DB, note *Note, txID string,
 	
 	// Record success metric for note
 	ds.metricsMu.RLock()
-	metrics := ds.metrics
+	dsMetrics := ds.metrics
 	ds.metricsMu.RUnlock()
-	if metrics != nil {
-		metrics.RecordNoteOperation("save", "success")
+	if dsMetrics != nil {
+		dsMetrics.RecordNoteOperation("save", "success")
 	}
 	
 	return nil
@@ -2043,10 +2047,10 @@ func (ds *DataStore) saveResultsInTransaction(tx *gorm.DB, results []Results, no
 				"result_index", i)
 			
 			ds.metricsMu.RLock()
-			metrics := ds.metrics
+			dsMetrics := ds.metrics
 			ds.metricsMu.RUnlock()
-			if metrics != nil {
-				metrics.RecordDbOperationError("create", "results", categorizeError(err))
+			if dsMetrics != nil {
+				dsMetrics.RecordDbOperationError("create", "results", categorizeError(err))
 			}
 			
 			return enhancedErr
@@ -2070,11 +2074,11 @@ func (ds *DataStore) commitTransactionWithMetrics(tx *gorm.DB, txID string, atte
 			"error", enhancedErr)
 		
 		ds.metricsMu.RLock()
-		metrics := ds.metrics
+		dsMetrics := ds.metrics
 		ds.metricsMu.RUnlock()
-		if metrics != nil {
-			metrics.RecordTransaction("rollback")
-			metrics.RecordTransactionError("save_note", categorizeError(err))
+		if dsMetrics != nil {
+			dsMetrics.RecordTransaction("rollback")
+			dsMetrics.RecordTransactionError("save_note", categorizeError(err))
 		}
 		
 		return enhancedErr
@@ -2082,10 +2086,10 @@ func (ds *DataStore) commitTransactionWithMetrics(tx *gorm.DB, txID string, atte
 	
 	// Record commit success
 	ds.metricsMu.RLock()
-	metrics := ds.metrics
+	dsMetrics := ds.metrics
 	ds.metricsMu.RUnlock()
-	if metrics != nil {
-		metrics.RecordTransaction("committed")
+	if dsMetrics != nil {
+		dsMetrics.RecordTransaction("committed")
 	}
 	
 	return nil
@@ -2101,10 +2105,10 @@ func (ds *DataStore) handleDatabaseLockError(attempt, maxRetries int, baseDelay 
 	
 	// Record retry metric
 	ds.metricsMu.RLock()
-	metrics := ds.metrics
+	dsMetrics := ds.metrics
 	ds.metricsMu.RUnlock()
-	if metrics != nil {
-		metrics.RecordTransactionRetry("save_note", "database_locked")
+	if dsMetrics != nil {
+		dsMetrics.RecordTransactionRetry("save_note", "database_locked")
 	}
 	
 	time.Sleep(delay)
@@ -2184,12 +2188,12 @@ func (ds *DataStore) recordTransactionSuccess(txStart time.Time, attempts, resul
 	
 	// Record success metrics
 	ds.metricsMu.RLock()
-	metrics := ds.metrics
+	dsMetrics := ds.metrics
 	ds.metricsMu.RUnlock()
-	if metrics != nil {
-		metrics.RecordTransactionDuration("save_note", duration.Seconds())
+	if dsMetrics != nil {
+		dsMetrics.RecordTransactionDuration("save_note", duration.Seconds())
 		if attempts > 1 {
-			metrics.RecordLockContention("database", "retry_succeeded")
+			dsMetrics.RecordLockContention("database", "retry_succeeded")
 		}
 	}
 }
@@ -2210,12 +2214,12 @@ func (ds *DataStore) handleMaxRetriesExhausted(lastErr error, txID string, txSta
 	
 	// Record failure metrics
 	ds.metricsMu.RLock()
-	metrics := ds.metrics
+	dsMetrics := ds.metrics
 	ds.metricsMu.RUnlock()
-	if metrics != nil {
-		metrics.RecordTransaction("timeout")
-		metrics.RecordTransactionError("save_note", "max_retries_exhausted")
-		metrics.RecordLockContention("database", "max_retries_exhausted")
+	if dsMetrics != nil {
+		dsMetrics.RecordTransaction("timeout")
+		dsMetrics.RecordTransactionError("save_note", "max_retries_exhausted")
+		dsMetrics.RecordLockContention("database", "max_retries_exhausted")
 	}
 	
 	return enhancedErr

@@ -93,15 +93,13 @@ func TestDataStoreMetricsAccessThreadSafety(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < numOperations; j++ {
-				// Simulate the pattern used in monitoring.go
-				ds.metricsMu.RLock()
-				metrics := ds.metrics
-				ds.metricsMu.RUnlock()
+				// Use helper method to avoid exposing implementation details
+				dsMetrics := ds.getMetricsSafely()
 				
 				// Use the metrics reference safely
-				if metrics != nil {
+				if dsMetrics != nil {
 					// Simulate metrics call (no-op for test)
-					_ = metrics
+					_ = dsMetrics
 				}
 				time.Sleep(time.Microsecond)
 			}
@@ -137,15 +135,13 @@ func TestDataStoreSetSunCalcMetricsThreadSafety(t *testing.T) {
 		}()
 	}
 
-	// Start goroutines that access SunCalc field
+	// Start goroutines that access SunCalc field (no locking needed since immutable)
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < numOperations; j++ {
-				// Simulate the pattern used in SetSunCalcMetrics
-				ds.metricsMu.RLock()
+				// SunCalc is immutable after initialization, no locking needed
 				sunCalc := ds.SunCalc
-				ds.metricsMu.RUnlock()
 				
 				if sunCalc != nil {
 					// Simulate accessing SunCalc (no-op for test)
@@ -224,15 +220,14 @@ func TestDataStoreMetricsRaceCondition(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < numOperations; j++ {
-				// Access pattern similar to monitoring code
-				ds.metricsMu.RLock()
-				localMetrics := ds.metrics
+				// Access metrics safely using helper method
+				localDsMetrics := ds.getMetricsSafely()
+				// SunCalc is immutable, no locking needed
 				localSunCalc := ds.SunCalc
-				ds.metricsMu.RUnlock()
 
 				// Use the local references
-				if localMetrics != nil {
-					_ = localMetrics
+				if localDsMetrics != nil {
+					_ = localDsMetrics
 				}
 				if localSunCalc != nil {
 					_ = localSunCalc
@@ -242,4 +237,9 @@ func TestDataStoreMetricsRaceCondition(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	// Verify DataStore is still in a valid state
+	if ds.getMetricsSafely() == nil && ds.SunCalc == nil {
+		t.Error("Both metrics and SunCalc should not be nil after operations")
+	}
 }
