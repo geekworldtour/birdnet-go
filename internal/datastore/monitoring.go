@@ -31,19 +31,19 @@ func (ds *DataStore) startConnectionPoolMonitoring(ctx context.Context, interval
 				
 				// Update metrics
 				ds.metricsMu.RLock()
-				metrics := ds.metrics
+				dsMetrics := ds.metrics
 				ds.metricsMu.RUnlock()
 				
-				if metrics != nil {
-					metrics.UpdateConnectionMetrics(
+				if dsMetrics != nil {
+					dsMetrics.UpdateConnectionMetrics(
 						stats.InUse,
 						stats.Idle,
 						stats.MaxOpenConnections,
 					)
 					
 					if stats.WaitCount > 0 {
-						metrics.RecordLockContention("connection_pool", "wait_for_connection")
-						metrics.RecordLockWaitTime("connection_pool", stats.WaitDuration.Seconds())
+						dsMetrics.RecordLockContention("connection_pool", "wait_for_connection")
+						dsMetrics.RecordLockWaitTime("connection_pool", stats.WaitDuration.Seconds())
 					}
 				}
 				
@@ -81,12 +81,12 @@ func (ds *DataStore) startDatabaseMonitoring(ctx context.Context, interval time.
 			case <-ticker.C:
 				// Get metrics reference once to avoid multiple lock acquisitions
 				ds.metricsMu.RLock()
-				metrics := ds.metrics
+				dsMetrics := ds.metrics
 				ds.metricsMu.RUnlock()
 				
 				// Update database size metrics
-				if dbSize, err := ds.getDatabaseSize(); err == nil && metrics != nil {
-					metrics.UpdateDatabaseSize(dbSize)
+				if dbSize, err := ds.getDatabaseSize(); err == nil && dsMetrics != nil {
+					dsMetrics.UpdateDatabaseSize(dbSize)
 				} else if err != nil {
 					getLogger().Error("Failed to get database size",
 						"error", err)
@@ -95,8 +95,8 @@ func (ds *DataStore) startDatabaseMonitoring(ctx context.Context, interval time.
 				// Update table row counts
 				tables := []string{"notes", "results", "image_caches", "note_reviews", "note_locks"}
 				for _, table := range tables {
-					if count, err := ds.getTableRowCount(table); err == nil && metrics != nil {
-						metrics.UpdateTableRowCount(table, count)
+					if count, err := ds.getTableRowCount(table); err == nil && dsMetrics != nil {
+						dsMetrics.UpdateTableRowCount(table, count)
 					} else if err != nil {
 						getLogger().Error("Failed to get table row count",
 							"table", table,
@@ -105,8 +105,8 @@ func (ds *DataStore) startDatabaseMonitoring(ctx context.Context, interval time.
 				}
 				
 				// Update active lock count
-				if lockCount, err := ds.getActiveLockCount(); err == nil && metrics != nil {
-					metrics.UpdateActiveLockCount(lockCount)
+				if lockCount, err := ds.getActiveLockCount(); err == nil && dsMetrics != nil {
+					dsMetrics.UpdateActiveLockCount(lockCount)
 				} else if err != nil {
 					getLogger().Error("Failed to get active lock count",
 						"error", err)
