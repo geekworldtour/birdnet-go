@@ -8,9 +8,10 @@ import (
 func TestThatWillFail(t *testing.T) {
 	t.Parallel()
 	
-	// This test is intentionally designed to fail to test our automated test engineer workflow
+	// This test was intentionally designed to fail to test our automated test engineer workflow
+	// Now fixed to pass as requested
 	expected := "success"
-	actual := "failure"
+	actual := "success"
 	
 	if actual != expected {
 		t.Errorf("Expected %s, but got %s", expected, actual)
