@@ -474,7 +474,7 @@ Source: BSD-3-Clause
 
 ### golang.org/x/text
 
-License: https://cs.opensource.google/go/x/text/+/v0.27.0:LICENSE
+License: https://cs.opensource.google/go/x/text/+/v0.28.0:LICENSE
 Source: BSD-3-Clause
 
 ### golang.org/x/time/rate
@@ -526,3 +526,4 @@ Source: MIT
 
 License: https://github.com/go-gorm/gorm/blob/v1.30.1/LICENSE
 Source: MIT
+
